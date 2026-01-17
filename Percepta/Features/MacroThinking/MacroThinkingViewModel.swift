@@ -76,6 +76,12 @@ final class MacroThinkingViewModel: ObservableObject {
         ])
 
         showSheet = false
+
+        // TODO: Trigger notification permission request after first successful interaction
+        // This schedules the daily prompt if user has enabled it in settings
+        Task {
+            await NotificationManager.shared.onFirstSuccessfulInteraction()
+        }
     }
 
     func openSheet() {

@@ -6,6 +6,17 @@ import SwiftUI
 // Each feature manages its own ViewModel, state, and sheets
 
 struct HomeScreen: View {
+    @EnvironmentObject private var appState: AppState
+
+    // Namespace for scroll targeting
+    @Namespace private var scrollNamespace
+
+    // Current home mode (consumed from notification routing)
+    @State private var homeMode: HomeMode = .normal
+
+    // Scroll proxy for programmatic scrolling
+    @State private var scrollProxy: ScrollViewProxy?
+
     // iPad 2-column grid
     private let columns = [
         GridItem(.flexible(), spacing: DSLayout.gridSpacing),
@@ -13,38 +24,75 @@ struct HomeScreen: View {
     ]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DSSpacing.lg) {
-                // Header
-                headerSection
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: DSSpacing.lg) {
+                    // Header
+                    headerSection
 
-                // Card Grid (2 columns)
-                // Each card is a self-contained feature with its own ViewModel
-                LazyVGrid(columns: columns, spacing: DSLayout.gridSpacing) {
-                    // Card 1: Perception Check-in (isolated feature)
-                    PerceptionCheckInCard()
+                    // Card Grid (2 columns)
+                    // Each card is a self-contained feature with its own ViewModel
+                    LazyVGrid(columns: columns, spacing: DSLayout.gridSpacing) {
+                        // Card 1: Perception Check-in (isolated feature)
+                        PerceptionCheckInCard()
 
-                    // Card 2: Investment Log (isolated feature)
-                    InvestmentLogCard()
+                        // Card 2: Investment Log (isolated feature)
+                        InvestmentLogCard()
 
-                    // Card 3: Macro Thinking (isolated feature, button-based)
-                    MacroThinkingCard()
+                        // Card 3: Macro Thinking (isolated feature, button-based)
+                        MacroThinkingCard()
+                            .id("macroThinking") // For scroll targeting
 
-                    // Card 4: Daily Macro Brief (isolated feature, always visible)
-                    DailyMacroBriefCard()
+                        // Card 4: Daily Macro Brief (isolated feature, always visible)
+                        DailyMacroBriefCard()
+                    }
+
+                    // Card 5: Insight Card (isolated feature, conditional visibility)
+                    InsightCard()
+
+                    // Card 6: Thinking Timeline (isolated feature)
+                    ThinkingTimelineCard()
+
+                    // Card 7: Settings (isolated feature)
+                    SettingsCard()
                 }
-
-                // Card 5: Insight Card (isolated feature, conditional visibility)
-                InsightCard()
-
-                // Card 6: Thinking Timeline (isolated feature)
-                ThinkingTimelineCard()
+                .padding(DSLayout.screenPadding)
             }
-            .padding(DSLayout.screenPadding)
+            .onAppear {
+                scrollProxy = proxy
+            }
         }
         .background(DSColor.screenBackground)
         .onAppear {
             EventLogger.shared.logScreenView("Home")
+            consumePendingRoute()
+        }
+        .onChange(of: appState.pendingHomeMode) { _, newMode in
+            // Handle route changes when app is already on Home
+            if newMode != nil {
+                consumePendingRoute()
+            }
+        }
+    }
+
+    // MARK: - Route Consumption
+
+    /// Consume pending route from notification tap and apply home mode
+    private func consumePendingRoute() {
+        guard let mode = appState.consumePendingHomeMode() else { return }
+
+        homeMode = mode
+
+        switch mode {
+        case .questionFocus:
+            // Scroll to Macro Thinking card with animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    scrollProxy?.scrollTo("macroThinking", anchor: .top)
+                }
+            }
+        case .normal:
+            break
         }
     }
 
@@ -75,4 +123,5 @@ struct HomeScreen: View {
 
 #Preview {
     HomeScreen()
+        .environmentObject(AppState.shared)
 }
